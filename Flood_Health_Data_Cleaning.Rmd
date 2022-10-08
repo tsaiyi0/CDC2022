@@ -1,0 +1,31 @@
+---
+title: "Flood Vulnerability Data Cleaning and Validation"
+output: html_document
+date: "2022-10-08"
+---
+
+```{r}
+library(tidyverse)
+FloodHealth = read.csv("Flood_Health_Vulnerability.csv")
+# change data to percentages
+FloodHealth$Diabetes = FloodHealth$Diabetes/100
+FloodHealth$MentalHealth = FloodHealth$MentalHealth/100
+FloodHealth$Asthma = FloodHealth$Asthma/100
+FloodHealth$HousingViolations = FloodHealth$HousingViolations/1000
+FloodHealth$Homeless = FloodHealth$Homeless/1000
+
+
+vec = colnames(FloodHealth)
+vec = vec[-c(1,8,9,15,16)]
+for (name in vec){
+  print(name)
+  exclude = which(FloodHealth[,name] < 0 | is.na(FloodHealth[,name]))
+  print(exclude)
+} 
+# We did not exclude the zero values in data, because we interpret zero values as "zero percent" instead of missing data.
+# There is no negative values or NA values. 
+
+write.csv(FloodHealth,"Flood_Health_Cleaned.csv")
+
+```
+
