@@ -1,0 +1,231 @@
+---
+title: "floodproject"
+author: "Elena Tsai"
+date: "2022-10-08"
+output: html_document
+---
+
+```{r, trace = FALSE}
+library(readr)
+library(tidyverse)
+library(car)
+library(leaps)
+library(caret)
+
+library(datasets)
+library(corrplot)
+library(dplyr)
+library(ggplot2)
+library(MASS)
+
+floods <- read.csv("Flood_Health_Cleaned.csv")
+risk <- read.csv("CommunityVulnerability2020.csv")
+risk <- risk[, c("GEOID", "socVulnRank")]
+houseinternet <- read.csv("houseinternet.csv")
+```
+```{r}
+library(devtools)
+library(psych)
+```
+
+
+```{r}
+#added new response variable 'social vulnerability rank' and new predictor variables 'house internet %'
+floodvuln = inner_join(floods, risk, by = c("Census.Blockgroup" = "GEOID"))
+floodvuln = inner_join(floodvuln, houseinternet, by = c("Census.Blockgroup" = "geoid"))
+#removed null values for social vulnerability variable
+floodvuln = subset(floodvuln, socVulnRank != "Not Calculated")
+floodvuln = subset(floodvuln, select = -c(X, FloodHealthIndex_Quintiles, FloodHealthIndex))
+floodvuln$socVulnRank <- factor(floodvuln$socVulnRank)
+#converted socVulnRank into ordinal numeric data
+floodvulnquant[floodvuln == 'Highest social vulnerability'] <- 4
+floodvulnquant[floodvuln == 'High social vulnerability'] <- 3
+floodvulnquant[floodvuln == 'Moderate social vulnerability'] <- 2
+floodvulnquant[floodvuln == 'Low social vulnerability'] <- 1
+#floodvulnquant$socVulnRank <- as.numeric((factor(floodvulnquant$socVulnRank)))
+```
+
+
+1 = High social vulnerability
+2 = Highest social vulnerability
+3 = Low social vulnerability
+4 = Moderate social vulnerability
+
+```{r}
+#calculate principal components
+results <- prcomp(floodvulnquant[, -18], center = TRUE, scale = TRUE)
+summary(results)
+
+#calculate total variance explained by each principal component
+var.explained = results$sdev^2 / sum(results$sdev^2)
+
+#create scree plot
+qplot(c(1:18), var.explained) + 
+  geom_line() + 
+  xlab("Principal Component") + 
+  ylab("Variance Explained") +
+  ggtitle("Scree Plot") +
+  ylim(0, 1)
+```
+```{r}
+pr_var <- (results$sdev)^2
+results$propvarex <- pr_var/sum(pr_var)
+```
+
+Principal components PC1-PC10 account for 0.90632 of the variance in the data; we will be using PC1-PC10 as our predictors to conduct ordinal logistic regression. 
+```{r}
+train.data <- data.frame(soc.VulnRank = floodvulnquant$socVulnRank, results$x[, 1:10])
+
+train.data$soc.VulnRank <- factor(train.data$soc.VulnRank, order = TRUE)
+
+m <- polr(soc.VulnRank ~ train.data$PC1+train.data$PC2+train.data$PC3+train.data$PC4+train.data$PC5+train.data$PC6+train.data$PC7+train.data$PC8+train.data$PC9+train.data$PC10, data = train.data, Hess=TRUE)
+
+summary(m)
+```
+```{r}
+## odds ratios
+exp(coef(m)
+```
+
+
+```{r}
+floods.quant <- subset(floods, select = -c(X, Census.Blockgroup, FloodHealthIndex_Quintiles))
+```
+
+
+```{r}
+floodhealth.mod <- lm(floods.quant$FloodHealthIndex~., data=floods.quant)
+MSE = (summary(floodhealth.mod)$sigma)^2
+none = lm(FloodHealthIndex~1, data = floods.quant)
+step(none, scope=list(upper=floodhealth.mod), scale = MSE, trace = FALSE)
+```
+```{r}
+stepwise.mod <- lm(formula = FloodHealthIndex ~ Poverty + Elevation + MentalHealth + 
+    Precipitation + Children + NonWhite + SeaLevelRise + Education + 
+    Homeless + LivAlone + Asthma + HousingViolations + English + 
+    Disability, data = floods.quant)
+
+summary(stepwise.mod)
+plot(stepwise.mod)
+```
+
+```{r}
+plot(FloodHealthIndex ~ Poverty + Elevation + MentalHealth + 
+    Precipitation + Children + NonWhite + SeaLevelRise + Education + 
+    Homeless + LivAlone + Asthma + HousingViolations + English + 
+    Disability, data = floods.quant)
+```
+
+
+```{r}
+set.seed(1789)
+# create a list of 70% of the rows in the original dataset we can use for training
+validation_index <- createDataPartition(floods.quant$FloodHealthIndex, p=0.70, list=FALSE)
+# select 30% of the data for validation
+holdout <- floods.quant[-validation_index,]
+# use the remaining 80% of data to training and testing the models
+training <- floods.quant[validation_index,]
+```
+
+```{r}
+num.cols <- sapply(floods.quant, is.numeric)
+num.cols
+
+cor.data<-cor(floods.quant[,num.cols])
+head(cor.data)
+corrplot(cor.data, method='color', addCoef.col = 1, tl.cex=0.5, number.cex=0.4)
+```
+```{r}
+training.mod <- lm(formula = FloodHealthIndex ~ Poverty + Elevation + MentalHealth + 
+    Precipitation + Children + NonWhite + SeaLevelRise + Education + 
+    Homeless + LivAlone + Asthma + HousingViolations + English + 
+    Disability, data = training)
+```
+
+```{r}
+predicted.values <- predict(training.mod, holdout)
+predicted.values #This displays the predicted values 
+res <-residuals(training.mod) # Find the residuals
+res<-as.data.frame(res) # Convert the residual into a dataframe
+```
+
+```{r}
+# compare the predicted vs actual values
+
+results<-cbind(predicted.values, holdout$FloodHealthIndex)
+
+colnames(results)<-c('predicted','real')
+
+results<-as.data.frame(results)
+
+head(results)
+```
+
+```{r}
+rmse <- sqrt(mean(predicted.values-holdout$FloodHealthIndex)^2) # Root Mean Square Error is the standard deviation of the residuals
+rmse
+```
+```{r}
+socialdemosubset <- floods[, c("Children", "Elderly", "NonWhite", "Poverty", "Education", "English", "FloodHealthIndex")]
+plot(FloodHealthIndex~., data = socialdemosubset)
+```
+
+```{r}
+bestsubset <- regsubsets(FloodHealthIndex~., data = floods.quant)
+summary(bestsubset)
+```
+```{r}
+res.sum <- summary(bestsubset)
+data.frame(
+  Adj.R2 = which.max(res.sum$adjr2),
+  CP = which.min(res.sum$cp),
+  BIC = which.min(res.sum$bic)
+)
+```
+```{r}
+bestsubset.mod <- lm(FloodHealthIndex~Children+NonWhite+Education+Elevation+SeaLevelRise+Precipitation+Asthma+LivAlone, data=floods.quant)
+vif(bestsubset.mod)
+full.mod <- lm(FloodHealthIndex~., data = floods.quant)
+vif(full.mod)
+```
+```{r}
+#principal component analysis
+
+floods.pca <- prcomp(training, center = TRUE, scale. = TRUE)
+require(pls)
+set.seed (1000)
+pcr_model <- pcr(FloodHealthIndex~Children+NonWhite+Education+Elevation+SeaLevelRise+Precipitation+Asthma+LivAlone, data = floods.quant, scale = TRUE, validation = "CV")
+summary(pcr_model)
+```
+```{r}
+library(psych)
+library(devtools)
+library(ggbiplot)
+library(clusterSim)
+```
+
+```{r}
+pairs.panels(floods.pca$x,
+             gap=0,
+             bg = c("red", "yellow", "blue")[training$FloodHealthIndex],
+             pch=21)
+```
+
+```{r}
+floods.quant.y <- floods.quant$FloodHealthIndex
+floods.quant.null <- subset(floods.quant, select = -FloodHealthIndex)
+#normalizing data
+floods.quant.norm <- data.Normalization(floods.quant.null, type="n1", normalization="column")
+floods.quant.y.norm <- data.Normalization(floods.quant.y, type="n1", normalization="column")
+```
+
+```{r}
+floods.quant.pca1 <- prcomp(floods.quant.norm, center=TRUE, scale.=TRUE)
+pcs <- as.data.frame(floods.quant.pca1$x)
+pcr.flood.data <- cbind(floods.quant.y.norm, pcs)
+```
+```{r}
+pcamodel <- lm(floods.quant.y.norm ~ ., data = pcr.flood.data)
+```
+
+
