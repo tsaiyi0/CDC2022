@@ -1,0 +1,90 @@
+---
+title: "plots"
+output: html_document
+---
+
+
+```{r}
+library(tidyverse)
+
+library(readr)
+
+flood=read_csv("Flood_Health_Vulnerability.csv")
+
+
+head(flood)
+
+```
+
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+
+ggplot(data = flood, mapping = aes(x = 	
+NonWhite
+, y = FloodHealthIndex)) +
+  geom_point(color = "blue")+geom_smooth(color = "red")
+
+
+
+
+```
+```{r}
+mod1=lm(NonWhite~FloodHealthIndex,data=flood)
+
+
+summary(mod1)
+```
+
+
+
+```{r}
+
+ggplot(data = flood, mapping = aes(x = 	
+NonWhite
+, y = Poverty)) +
+  geom_point()+geom_smooth(se = FALSE)
+
+```
+
+```{r}
+social=flood[,c("Poverty","NonWhite","Education","Homeless")]
+library(ggcorrplot)
+social
+a1=cor(social)
+ggcorrplot(a1,lab = TRUE,
+outline.color = "white",
+  ggtheme = ggplot2::theme_gray,
+  colors = c("#6D9EC1", "white", "#E46726"),type = "lower")
+```
+
+```{r}
+flood2=subset(flood[,2:17])
+
+flood2
+```
+
+
+```{r}
+
+require(pls)
+set.seed(1)
+mod.pcr <- pcr(NonWhite~ ., data =flood2, scale = T, validation = "CV", segments = 5) 
+summary(mod.pcr)
+
+```
+
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
