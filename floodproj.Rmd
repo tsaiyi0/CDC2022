@@ -36,7 +36,7 @@ floodvuln = inner_join(floodvuln, houseinternet, by = c("Census.Blockgroup" = "g
 #removed null values for social vulnerability variable
 floodvuln = subset(floodvuln, socVulnRank != "Not Calculated")
 floodvuln = subset(floodvuln, select = -c(X, FloodHealthIndex_Quintiles, FloodHealthIndex))
-floodvuln$socVulnRank <- factor(floodvuln$socVulnRank)
+floodvuln$socVulnRank <- factor(floodvuln$socVulnRank, ordered=TRUE, levels = c('Low social vulnerability', 'Moderate social vulnerability', 'High social vulnerability', 'Highest social vulnerability'))
 #converted socVulnRank into ordinal numeric data
 floodvulnquant[floodvuln == 'Highest social vulnerability'] <- 4
 floodvulnquant[floodvuln == 'High social vulnerability'] <- 3
@@ -84,8 +84,19 @@ summary(m)
 ```
 ```{r}
 ## odds ratios
-exp(coef(m)
+exp(coef(m))
 ```
+```{r}
+#without pca
+more <- polr(floodvuln$socVulnRank~floodvuln$Census.Blockgroup+floodvuln$Children+floodvuln$Elderly+floodvuln$NonWhite+floodvuln$Poverty+floodvuln$Education+floodvuln$English+floodvuln$Elevation+floodvuln$SeaLevelRise+floodvuln$Precipitation+floodvuln$Precipitation+floodvuln$Diabetes+floodvuln$MentalHealth+floodvuln$Asthma+floodvuln$Disability+floodvuln$HousingViolations+floodvuln$Homeless+floodvuln$LivAlone+floodvuln$percentage, data=floodvuln, Hess = TRUE)
+
+oin <- polr(floodvuln$socVulnRank~1, data = floodvuln, Hess = TRUE)
+
+anova(oin, m)
+anova(m,more)
+```
+The chi-square is 66.94874 and p = 1.984812e-11. This means that you can reject the null hypothesis that the model without intercept is as good as the model with the predictors.
+
 
 
 ```{r}
