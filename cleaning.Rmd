@@ -1,0 +1,60 @@
+
+```{r}
+library(tidyverse)
+
+library(readr)
+
+internet=read_csv("ACSDT5Y2017.B28011-Data.csv")
+
+
+head(internet)
+```
+
+```{r}
+internet2=internet[-1,]
+
+head(internet2)
+```
+
+```{r}
+geoid=gsub("1500000US0","",internet2$GEO_ID)
+
+internet3=internet2[,"B28011_002E"]
+internet4=internet2[,"B28011_001E"]
+
+
+internet3=as.numeric(unlist(internet3))
+internet3=as.vector(internet3)
+
+internet4=as.numeric(unlist(internet4))
+
+percentage = internet3/internet4
+percentage
+which(internet4 == 0)
+internet[c(173, 577, 581),]
+
+
+internet4
+geoid=as.vector(geoid)
+```
+
+```{r}
+houseinternet <- data.frame(geoid,percentage)
+```
+
+```{r}
+
+write.csv(houseinternet,"houseinternet.csv", row.names = FALSE)
+
+```
+
+```{r}
+set.seed(1)
+mod.pcr <- pcr( ~ ., data = data_train, scale = T, validation = "CV", segments = 5) summary(mod.pcr)
+```
+
+
+```{r}
+
+```
+
